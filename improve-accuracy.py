@@ -1,21 +1,32 @@
+import os
+import warnings
+
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, classification_report, confusion_matrix
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.decomposition import PCA
-from skimage.feature import local_binary_pattern, hog
+from skimage.feature import hog, local_binary_pattern
 from skimage.filters import gabor
-import cv2
-import os
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
 from tqdm import tqdm
-import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 from pathlib import Path
+
 
 class KaggleOptimizedPlantDiseaseClassifier:
     def __init__(self):
@@ -40,19 +51,25 @@ class KaggleOptimizedPlantDiseaseClassifier:
 
         # 1. HOG Features - Most important for texture
         try:
-            hog_features = hog(gray, orientations=9, pixels_per_cell=(16, 16),
-                              cells_per_block=(2, 2), block_norm='L2-Hys',
-                              transform_sqrt=True, feature_vector=True)
+            hog_features = hog(
+                gray,
+                orientations=9,
+                pixels_per_cell=(16, 16),
+                cells_per_block=(2, 2),
+                block_norm="L2-Hys",
+                transform_sqrt=True,
+                feature_vector=True,
+            )
             features.extend(hog_features)
         except:
             features.extend([0] * 8100)  # HOG feature size
 
         # 2. LBP Features - Efficient texture analysis
         try:
-            lbp = local_binary_pattern(gray, P=16, R=2, method='uniform')
+            lbp = local_binary_pattern(gray, P=16, R=2, method="uniform")
             lbp_hist, _ = np.histogram(lbp.ravel(), bins=64, range=(0, 63))
             lbp_hist = lbp_hist.astype(float)
-            lbp_hist /= (lbp_hist.sum() + 1e-8)
+            lbp_hist /= lbp_hist.sum() + 1e-8
             features.extend(lbp_hist)
         except:
             features.extend([0] * 64)
@@ -78,10 +95,15 @@ class KaggleOptimizedPlantDiseaseClassifier:
         # 4. Statistical features
         try:
             stats_features = [
-                np.mean(gray), np.std(gray), np.median(gray),
-                np.mean(hsv[:,:,0]), np.std(hsv[:,:,0]),
-                np.mean(hsv[:,:,1]), np.std(hsv[:,:,1]),
-                np.mean(hsv[:,:,2]), np.std(hsv[:,:,2]),
+                np.mean(gray),
+                np.std(gray),
+                np.median(gray),
+                np.mean(hsv[:, :, 0]),
+                np.std(hsv[:, :, 0]),
+                np.mean(hsv[:, :, 1]),
+                np.std(hsv[:, :, 1]),
+                np.mean(hsv[:, :, 2]),
+                np.std(hsv[:, :, 2]),
             ]
             features.extend(stats_features)
         except:
@@ -101,21 +123,31 @@ class KaggleOptimizedPlantDiseaseClassifier:
         total_images = 0
 
         # Get all class directories
-        class_dirs = sorted([d for d in os.listdir(dataset_path)
-                           if os.path.isdir(os.path.join(dataset_path, d))])
+        class_dirs = sorted(
+            [
+                d
+                for d in os.listdir(dataset_path)
+                if os.path.isdir(os.path.join(dataset_path, d))
+            ]
+        )
 
         print(f"📁 Found {len(class_dirs)} classes: {class_dirs}")
 
         for class_idx, class_dir in enumerate(class_dirs, 1):
             class_path = os.path.join(dataset_path, class_dir)
-            image_files = [f for f in os.listdir(class_path)
-                          if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            image_files = [
+                f
+                for f in os.listdir(class_path)
+                if f.lower().endswith((".png", ".jpg", ".jpeg"))
+            ]
 
             # NO LIMITS - process ALL images
             class_counts[class_dir] = len(image_files)
             total_images += len(image_files)
 
-            print(f"\n🔍 Processing {class_idx}/{len(class_dirs)}: {class_dir} ({len(image_files)} images)...")
+            print(
+                f"\n🔍 Processing {class_idx}/{len(class_dirs)}: {class_dir} ({len(image_files)} images)..."
+            )
 
             for image_file in tqdm(image_files, desc=f"{class_dir[:15]}..."):
                 try:
@@ -163,7 +195,9 @@ class KaggleOptimizedPlantDiseaseClassifier:
         X_reduced = self.pca.fit_transform(X_scaled)
 
         print(f"   Reduced features: {X_reduced.shape[1]}")
-        print(f"   Variance preserved: {np.sum(self.pca.explained_variance_ratio_):.4f}")
+        print(
+            f"   Variance preserved: {np.sum(self.pca.explained_variance_ratio_):.4f}"
+        )
 
         return X_reduced
 
@@ -181,25 +215,25 @@ class KaggleOptimizedPlantDiseaseClassifier:
 
         # Random Forest - optimized for accuracy
         self.rf_model = RandomForestClassifier(
-            n_estimators=200,           # More trees for better accuracy
-            max_depth=50,               # Deeper trees
-            min_samples_split=2,        # More splits
-            min_samples_leaf=1,         # Fine-grained leaves
-            max_features='sqrt',        # Feature sampling
+            n_estimators=200,  # More trees for better accuracy
+            max_depth=50,  # Deeper trees
+            min_samples_split=2,  # More splits
+            min_samples_leaf=1,  # Fine-grained leaves
+            max_features="sqrt",  # Feature sampling
             bootstrap=True,
             random_state=42,
-            n_jobs=-1,                  # Use all Kaggle cores
-            verbose=1
+            n_jobs=-1,  # Use all Kaggle cores
+            verbose=1,
         )
 
         # SVM - optimized parameters
         self.svm_model = SVC(
-            C=10,                       # Less regularization
-            gamma='scale',
-            kernel='rbf',
+            C=10,  # Less regularization
+            gamma="scale",
+            kernel="rbf",
             probability=True,
             random_state=42,
-            verbose=1
+            verbose=1,
         )
 
         print("🌳 Training Random Forest...")
@@ -216,9 +250,9 @@ class KaggleOptimizedPlantDiseaseClassifier:
         """
         Comprehensive model evaluation
         """
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("📊 COMPREHENSIVE MODEL EVALUATION")
-        print("="*70)
+        print("=" * 70)
 
         # Encode labels
         y_test_encoded = self.label_encoder.transform(y_test)
@@ -234,14 +268,18 @@ class KaggleOptimizedPlantDiseaseClassifier:
         rf_pred = self.rf_model.predict(X_test_processed)
         rf_pred_proba = self.rf_model.predict_proba(X_test_processed)
 
-        results['Random Forest'] = self._calculate_metrics(y_test_encoded, rf_pred, rf_pred_proba)
+        results["Random Forest"] = self._calculate_metrics(
+            y_test_encoded, rf_pred, rf_pred_proba
+        )
 
         # SVM Evaluation
         print("🔍 Evaluating SVM...")
         svm_pred = self.svm_model.predict(X_test_processed)
         svm_pred_proba = self.svm_model.predict_proba(X_test_processed)
 
-        results['SVM'] = self._calculate_metrics(y_test_encoded, svm_pred, svm_pred_proba)
+        results["SVM"] = self._calculate_metrics(
+            y_test_encoded, svm_pred, svm_pred_proba
+        )
 
         # Display results
         self._display_results(results)
@@ -252,58 +290,92 @@ class KaggleOptimizedPlantDiseaseClassifier:
     def _calculate_metrics(self, y_true, y_pred, y_pred_proba):
         """Calculate all evaluation metrics"""
         return {
-            'Accuracy': accuracy_score(y_true, y_pred),
-            'Precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
-            'Recall': recall_score(y_true, y_pred, average='weighted', zero_division=0),
-            'F1-Score': f1_score(y_true, y_pred, average='weighted', zero_division=0),
-            'AUC-ROC': roc_auc_score(y_true, y_pred_proba, multi_class='ovr', average='weighted')
+            "Accuracy": accuracy_score(y_true, y_pred),
+            "Precision": precision_score(
+                y_true, y_pred, average="weighted", zero_division=0
+            ),
+            "Recall": recall_score(y_true, y_pred, average="weighted", zero_division=0),
+            "F1-Score": f1_score(y_true, y_pred, average="weighted", zero_division=0),
+            "AUC-ROC": roc_auc_score(
+                y_true, y_pred_proba, multi_class="ovr", average="weighted"
+            ),
         }
 
     def _display_results(self, results):
         """Display results in a professional table"""
         print("\n🏆 MODEL PERFORMANCE COMPARISON")
         print("=" * 85)
-        print(f"{'Algorithm':<20} {'Accuracy':<12} {'Precision':<12} {'Recall':<12} {'F1-Score':<12} {'AUC-ROC':<12}")
+        print(
+            f"{'Algorithm':<20} {'Accuracy':<12} {'Precision':<12} {'Recall':<12} {'F1-Score':<12} {'AUC-ROC':<12}"
+        )
         print("=" * 85)
 
         for model, metrics in results.items():
-            print(f"{model:<20} {metrics['Accuracy']:<12.4f} {metrics['Precision']:<12.4f} "
-                  f"{metrics['Recall']:<12.4f} {metrics['F1-Score']:<12.4f} {metrics['AUC-ROC']:<12.4f}")
+            print(
+                f"{model:<20} {metrics['Accuracy']:<12.4f} {metrics['Precision']:<12.4f} "
+                f"{metrics['Recall']:<12.4f} {metrics['F1-Score']:<12.4f} {metrics['AUC-ROC']:<12.4f}"
+            )
 
     def _plot_results(self, results):
         """Plot comparison chart"""
-        metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'AUC-ROC']
-        rf_scores = [results['Random Forest'][m] for m in metrics]
-        svm_scores = [results['SVM'][m] for m in metrics]
+        metrics = ["Accuracy", "Precision", "Recall", "F1-Score", "AUC-ROC"]
+        rf_scores = [results["Random Forest"][m] for m in metrics]
+        svm_scores = [results["SVM"][m] for m in metrics]
 
         x = np.arange(len(metrics))
         width = 0.35
 
         fig, ax = plt.subplots(figsize=(14, 8))
-        bars1 = ax.bar(x - width/2, rf_scores, width, label='Random Forest', color='#2E8B57', alpha=0.8)
-        bars2 = ax.bar(x + width/2, svm_scores, width, label='SVM', color='#4682B4', alpha=0.8)
+        bars1 = ax.bar(
+            x - width / 2,
+            rf_scores,
+            width,
+            label="Random Forest",
+            color="#2E8B57",
+            alpha=0.8,
+        )
+        bars2 = ax.bar(
+            x + width / 2, svm_scores, width, label="SVM", color="#4682B4", alpha=0.8
+        )
 
-        ax.set_xlabel('Evaluation Metrics', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Score', fontsize=12, fontweight='bold')
-        ax.set_title('Plant Disease Classification Performance\n(20.6K Images - Complete Dataset)',
-                    fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel("Evaluation Metrics", fontsize=12, fontweight="bold")
+        ax.set_ylabel("Score", fontsize=12, fontweight="bold")
+        ax.set_title(
+            "Plant Disease Classification Performance\n(20.6K Images - Complete Dataset)",
+            fontsize=14,
+            fontweight="bold",
+            pad=20,
+        )
         ax.set_xticks(x)
         ax.set_xticklabels(metrics, fontsize=11)
         ax.legend(fontsize=12)
         ax.set_ylim(0, 1)
-        ax.grid(axis='y', alpha=0.3)
+        ax.grid(axis="y", alpha=0.3)
 
         # Add value labels
         for bar, score in zip(bars1, rf_scores):
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                   f'{score:.3f}', ha='center', va='bottom', fontweight='bold')
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.01,
+                f"{score:.3f}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
 
         for bar, score in zip(bars2, svm_scores):
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
-                   f'{score:.3f}', ha='center', va='bottom', fontweight='bold')
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.01,
+                f"{score:.3f}",
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
 
         plt.tight_layout()
         plt.show()
+
 
 def main():
     """
@@ -324,7 +396,12 @@ def main():
     # dataset_path = "/kaggle/input/plantdisease/PlantVillage"
     # For: custom python environment
     DATASET_KAGGLEHUB_PATH = "emmarex/plantdisease/versions/1"
-    dataset_path = Path.home() / Path(".cache/kagglehub/datasets") / DATASET_KAGGLEHUB_PATH / "PlantVillage"
+    dataset_path = (
+        Path.home()
+        / Path(".cache/kagglehub/datasets")
+        / DATASET_KAGGLEHUB_PATH
+        / "PlantVillage"
+    )
 
     if not os.path.exists(dataset_path):
         print(f"❌ Dataset not found at: {dataset_path}")
@@ -352,34 +429,44 @@ def main():
     y_train_encoded = classifier.train_models(X_train, y_train)
 
     # Evaluate models
-    results, rf_pred, svm_pred, y_test_encoded = classifier.evaluate_models(X_test, y_test)
+    results, rf_pred, svm_pred, y_test_encoded = classifier.evaluate_models(
+        X_test, y_test
+    )
 
     # Detailed reports
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("📋 DETAILED CLASSIFICATION REPORTS")
-    print("="*70)
+    print("=" * 70)
 
     X_test_scaled = classifier.scaler.transform(X_test)
     X_test_processed = classifier.pca.transform(X_test_scaled)
 
     print("\n🌳 RANDOM FOREST - Detailed Performance:")
     print("-" * 60)
-    print(classification_report(y_test_encoded, rf_pred,
-                              target_names=classifier.label_encoder.classes_))
+    print(
+        classification_report(
+            y_test_encoded, rf_pred, target_names=classifier.label_encoder.classes_
+        )
+    )
 
     print("\n🔷 SVM - Detailed Performance:")
     print("-" * 60)
     svm_pred_final = classifier.svm_model.predict(X_test_processed)
-    print(classification_report(y_test_encoded, svm_pred_final,
-                              target_names=classifier.label_encoder.classes_))
+    print(
+        classification_report(
+            y_test_encoded,
+            svm_pred_final,
+            target_names=classifier.label_encoder.classes_,
+        )
+    )
 
     # Final summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("🎯 FINAL RESULTS SUMMARY")
-    print("="*70)
+    print("=" * 70)
 
-    rf_acc = results['Random Forest']['Accuracy']
-    svm_acc = results['SVM']['Accuracy']
+    rf_acc = results["Random Forest"]["Accuracy"]
+    svm_acc = results["SVM"]["Accuracy"]
 
     print(f"🌳 Random Forest Accuracy: {rf_acc:.4f} ({rf_acc*100:.2f}%)")
     print(f"🔷 SVM Accuracy: {svm_acc:.4f} ({svm_acc*100:.2f}%)")
@@ -399,6 +486,7 @@ def main():
         print("✅ VERY GOOD! Close to paper performance!")
     else:
         print("🔧 Good baseline - further optimization possible")
+
 
 if __name__ == "__main__":
     main()

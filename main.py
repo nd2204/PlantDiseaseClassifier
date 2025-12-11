@@ -8,32 +8,38 @@ print("Path to PlantVillage dataset files:", path)
 
 # Step 1: Import all necessary libraries
 import os
+import time
 from pathlib import Path
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.decomposition import PCA
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, classification_report
-from xgboost import XGBClassifier
 
 # Libraries for image processing and feature extraction
 import cv2
+import numpy as np
+import pandas as pd
 from skimage import feature, io
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.svm import SVC
 from tqdm import tqdm
-import time
+from xgboost import XGBClassifier
 
 # Step 2: Set up paths and parameters
 
 # For: kaggle notebook
 # dataset_path = "/kaggle/input/plantdisease/PlantVillage"
 # For: custom python environment
-dataset_path = Path.home() / Path(".cache/kagglehub/datasets") / DATASET_KAGGLEHUB_PATH / "PlantVillage"
+dataset_path = (
+    Path.home()
+    / Path(".cache/kagglehub/datasets")
+    / DATASET_KAGGLEHUB_PATH
+    / "PlantVillage"
+)
 
 img_size = (128, 128)
+
 
 # Step 3: Enhanced feature extraction with detailed progress
 def extract_features(image_path):
@@ -54,8 +60,14 @@ def extract_features(image_path):
         img_lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
         # Extract HOG features for texture
-        hog_features = feature.hog(img_gray, orientations=9, pixels_per_cell=(8, 8),
-                                   cells_per_block=(2, 2), transform_sqrt=True, block_norm='L2-Hys')
+        hog_features = feature.hog(
+            img_gray,
+            orientations=9,
+            pixels_per_cell=(8, 8),
+            cells_per_block=(2, 2),
+            transform_sqrt=True,
+            block_norm="L2-Hys",
+        )
 
         # Extract color histogram features from multiple color spaces
         color_hist_features = []
@@ -70,6 +82,7 @@ def extract_features(image_path):
     except Exception as e:
         print(f"Error processing {image_path}: {str(e)}")
         return None
+
 
 # Step 4: Enhanced preprocessing with comprehensive progress tracking
 print("🚀 Starting Plant Disease Detection Pipeline...")
@@ -146,7 +159,9 @@ pca = PCA(n_components=0.95, random_state=42)
 X_train_pca = pca.fit_transform(X_train_scaled)
 X_test_pca = pca.transform(X_test_scaled)
 
-print(f"✅ Reduced feature dimensions: {X_train_pca.shape[1]} (from {X_train.shape[1]})")
+print(
+    f"✅ Reduced feature dimensions: {X_train_pca.shape[1]} (from {X_train.shape[1]})"
+)
 print(f"📈 Explained variance: {pca.explained_variance_ratio_.sum():.3f}")
 
 # Phase 4: Model Training
@@ -155,10 +170,14 @@ print("-" * 30)
 
 # All models now use CPU only (GPU parameters removed)
 classifiers = {
-    "Support Vector Machine": SVC(kernel='rbf', random_state=42, verbose=False),
-    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, verbose=0),
+    "Support Vector Machine": SVC(kernel="rbf", random_state=42, verbose=False),
+    "Random Forest": RandomForestClassifier(
+        n_estimators=100, random_state=42, n_jobs=-1, verbose=0
+    ),
     "k-Nearest Neighbors": KNeighborsClassifier(n_neighbors=5, n_jobs=-1),
-    "XGBoost": XGBClassifier(random_state=42, n_jobs=-1, verbosity=0)  # GPU parameter removed
+    "XGBoost": XGBClassifier(
+        random_state=42, n_jobs=-1, verbosity=0
+    ),  # GPU parameter removed
 }
 
 results = {}
@@ -243,6 +262,7 @@ for i, (model, acc) in enumerate(sorted_results, 1):
 print("\n🎯 Pipeline completed successfully!")
 
 import kagglehub
+
 # Download latest version
 path = kagglehub.dataset_download("mohitsingh1804/plantvillage")
 
